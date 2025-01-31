@@ -1,0 +1,32 @@
+import jwt
+from datetime import datetime, timedelta
+from typing import Union
+from app import schemas, models
+from fastapi import HTTPException, status
+from passlib.context import CryptContext
+
+# Secret key for encoding and decoding JWT
+SECRET_KEY = "mysecretkey"  # Change this to something secret in production
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30  # Token expires in 30 minutes
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def create_access_token(data: dict, expires_delta: Union[timedelta, None] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)  # Default 15 mins expiration
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_user(db, username: str):
+    return db.query(models.User).filter(models.User.username == username).first()
