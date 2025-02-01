@@ -4,13 +4,17 @@ from sqlalchemy.orm import Session
 from app.database import engine
 from app import crud, models, schemas
 from app.database import SessionLocal
+from app.recipe_routes import recipe_routes
 import app.auth as auth
 from datetime import timedelta
+from app import models
 
 # Create all tables in the database
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+app.include_router(recipe_routes.router)
 
 
 @app.get("/")
@@ -48,3 +52,36 @@ def login(
     )
 
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+@app.get("/profile/")
+def get_profile(
+    username: str = Depends(auth.get_current_user), db: Session = Depends(get_db)
+):
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {
+        "username": user.username,
+        "email": user.email,
+    }
+
+
+@app.put("/profile/update/")
+def update_profile(
+    user_update: schemas.UserUpdate,
+    username: str = Depends(auth.get_current_user),
+    db: Session = Depends(get_db),
+):
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.email = user_update.email or user.email
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "message": "Profile updated successfully",
+        "user": {"username": user.username, "email": user.email},
+    }
